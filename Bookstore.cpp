@@ -1,236 +1,262 @@
 #include <iostream>
 #include <vector>
 #include <iomanip>
-#include <algorithm>
+#include <string>
 #include <fstream>
+#include <map>
 
-class Student {
+// Book Class
+class Book {
+public:
+    std::string title;
+    std::string author;
+    std::string category;
+    int quantity;
+    double price;
+
+    Book(std::string t, std::string a, std::string c, int q, double p)
+        : title(t), author(a), category(c), quantity(q), price(p) {}
+
+    void displayBook() const {
+        std::cout << std::setw(20) << title
+                  << std::setw(20) << author
+                  << std::setw(15) << category
+                  << std::setw(10) << quantity
+                  << std::setw(10) << price << std::endl;
+    }
+};
+
+// Customer Class
+class Customer {
 public:
     std::string name;
-    int rollNumber;
-    double marks;
+    std::map<std::string, int> purchases; // book title and quantity purchased
 
-    Student(std::string n, int roll, double m)
-        : name(n), rollNumber(roll), marks(m) {}
+    Customer(const std::string& n) : name(n) {}
+
+    void addPurchase(const std::string& bookTitle, int quantity) {
+        purchases[bookTitle] += quantity;
+    }
+
+    void displayPurchases() const {
+        std::cout << "Customer: " << name << std::endl;
+        for (const auto& p : purchases) {
+            std::cout << p.first << " - " << p.second << " copies" << std::endl;
+        }
+    }
 };
 
-class StudentRecordSystem {
+// Bookstore Class
+class Bookstore {
 private:
-    std::vector<Student> students;
+    std::vector<Book> books;
+    std::vector<Customer> customers;
 
 public:
-    // Add student to the system
-    void addStudent(const Student& student) {
-        students.push_back(student);
+    // Add Book to Inventory
+    void addBook(const Book& book) {
+        books.push_back(book);
     }
 
-    // Display all students
-    void displayStudents() const {
-        if (students.empty()) {
-            std::cout << "No students to display.\n";
-            return;
-        }
-
-        std::cout << std::setw(20) << "Name" << std::setw(15) << "Roll Number"
-                  << std::setw(10) << "Marks" << std::endl;
-
-        for (const auto& student : students) {
-            std::cout << std::setw(20) << student.name
-                      << std::setw(15) << student.rollNumber
-                      << std::setw(10) << student.marks << std::endl;
+    // Display All Books in Inventory
+    void displayBooks() const {
+        std::cout << std::setw(20) << "Title" 
+                  << std::setw(20) << "Author"
+                  << std::setw(15) << "Category"
+                  << std::setw(10) << "Quantity" 
+                  << std::setw(10) << "Price" << std::endl;
+        
+        for (const auto& book : books) {
+            book.displayBook();
         }
     }
 
-    // Search for a student by roll number
-    void searchStudent(int rollNumber) const {
-        auto it = std::find_if(students.begin(), students.end(),
-            [rollNumber](const Student& student) { return student.rollNumber == rollNumber; });
+    // Search for Books by Title
+    void searchBooksByTitle(const std::string& title) const {
+        bool found = false;
+        for (const auto& book : books) {
+            if (book.title.find(title) != std::string::npos) {
+                book.displayBook();
+                found = true;
+            }
+        }
+        if (!found) {
+            std::cout << "No books found with title: " << title << std::endl;
+        }
+    }
 
-        if (it != students.end()) {
-            std::cout << "Student found:\n";
-            std::cout << std::setw(20) << "Name" << std::setw(15) << "Roll Number"
-                      << std::setw(10) << "Marks" << std::endl;
-            std::cout << std::setw(20) << it->name
-                      << std::setw(15) << it->rollNumber
-                      << std::setw(10) << it->marks << std::endl;
+    // Sell Book to a Customer
+    bool sellBook(const std::string& title, int quantity, const std::string& customerName) {
+        for (auto& book : books) {
+            if (book.title == title && book.quantity >= quantity) {
+                book.quantity -= quantity;
+
+                // Find or create a customer
+                Customer* customer = findCustomer(customerName);
+                if (!customer) {
+                    customers.emplace_back(customerName);
+                    customer = &customers.back();
+                }
+                customer->addPurchase(title, quantity);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Restock a Book
+    bool restockBook(const std::string& title, int quantity) {
+        for (auto& book : books) {
+            if (book.title == title) {
+                book.quantity += quantity;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Generate Inventory Report (Low Stock)
+    void generateLowStockReport(int threshold) const {
+        std::cout << "Books with stock below " << threshold << ":\n";
+        for (const auto& book : books) {
+            if (book.quantity < threshold) {
+                book.displayBook();
+            }
+        }
+    }
+
+    // Display Customer Purchases
+    void displayCustomerPurchases(const std::string& customerName) const {
+        const Customer* customer = findCustomer(customerName);
+        if (customer) {
+            customer->displayPurchases();
         } else {
-            std::cout << "Student not found.\n";
+            std::cout << "Customer not found.\n";
         }
     }
 
-    // Update a student's record
-    void updateStudent(int rollNumber) {
-        auto it = std::find_if(students.begin(), students.end(),
-            [rollNumber](const Student& student) { return student.rollNumber == rollNumber; });
-
-        if (it != students.end()) {
-            std::string newName;
-            double newMarks;
-
-            std::cout << "Enter new name for student: ";
-            std::cin.ignore();
-            std::getline(std::cin, newName);
-
-            std::cout << "Enter new marks for student: ";
-            std::cin >> newMarks;
-
-            it->name = newName;
-            it->marks = newMarks;
-
-            std::cout << "Student updated successfully.\n";
-        } else {
-            std::cout << "Student not found.\n";
-        }
-    }
-
-    // Delete a student's record
-    void deleteStudent(int rollNumber) {
-        auto it = std::remove_if(students.begin(), students.end(),
-            [rollNumber](const Student& student) { return student.rollNumber == rollNumber; });
-
-        if (it != students.end()) {
-            students.erase(it, students.end());
-            std::cout << "Student deleted successfully.\n";
-        } else {
-            std::cout << "Student not found.\n";
-        }
-    }
-
-    // Sort students by marks or name
-    void sortStudents(bool byMarks = true) {
-        if (byMarks) {
-            std::sort(students.begin(), students.end(),
-                [](const Student& a, const Student& b) { return a.marks > b.marks; });
-            std::cout << "Students sorted by marks.\n";
-        } else {
-            std::sort(students.begin(), students.end(),
-                [](const Student& a, const Student& b) { return a.name < b.name; });
-            std::cout << "Students sorted by name.\n";
-        }
-    }
-
-    // Save student records to a file
+    // Save Bookstore Data to File
     void saveToFile(const std::string& filename) const {
-        std::ofstream outFile(filename);
-        if (outFile.is_open()) {
-            for (const auto& student : students) {
-                outFile << student.name << "," << student.rollNumber << "," << student.marks << "\n";
-            }
-            outFile.close();
-            std::cout << "Data saved to file.\n";
-        } else {
-            std::cout << "Error opening file.\n";
+        std::ofstream file(filename);
+        for (const auto& book : books) {
+            file << book.title << "," << book.author << "," << book.category
+                 << "," << book.quantity << "," << book.price << std::endl;
         }
+        file.close();
     }
 
-    // Load student records from a file
+    // Load Bookstore Data from File
     void loadFromFile(const std::string& filename) {
-        std::ifstream inFile(filename);
-        if (inFile.is_open()) {
-            students.clear();
-            std::string name;
-            int rollNumber;
-            double marks;
-
-            while (inFile >> std::ws && std::getline(inFile, name, ',') &&
-                   inFile >> rollNumber >> std::ws && inFile.get() &&
-                   inFile >> marks >> std::ws) {
-                students.push_back(Student(name, rollNumber, marks));
-            }
-            inFile.close();
-            std::cout << "Data loaded from file.\n";
-        } else {
-            std::cout << "Error opening file.\n";
+        std::ifstream file(filename);
+        std::string title, author, category;
+        int quantity;
+        double price;
+        while (file >> std::ws && std::getline(file, title, ',') &&
+               std::getline(file, author, ',') &&
+               std::getline(file, category, ',') &&
+               file >> quantity >> price) {
+            books.emplace_back(title, author, category, quantity, price);
         }
+        file.close();
+    }
+
+private:
+    // Find Customer by Name
+    Customer* findCustomer(const std::string& name) {
+        for (auto& customer : customers) {
+            if (customer.name == name) {
+                return &customer;
+            }
+        }
+        return nullptr;
+    }
+
+    const Customer* findCustomer(const std::string& name) const {
+        for (const auto& customer : customers) {
+            if (customer.name == name) {
+                return &customer;
+            }
+        }
+        return nullptr;
     }
 };
 
+// Main Program
 int main() {
-    StudentRecordSystem recordSystem;
+    Bookstore bookstore;
+
+    // Load initial data from a file
+    bookstore.loadFromFile("books_data.txt");
 
     int choice;
     do {
         std::cout << "\nOptions:\n";
-        std::cout << "1. Display Students\n";
-        std::cout << "2. Search Student\n";
-        std::cout << "3. Add Student\n";
-        std::cout << "4. Update Student\n";
-        std::cout << "5. Delete Student\n";
-        std::cout << "6. Sort Students by Marks\n";
-        std::cout << "7. Sort Students by Name\n";
-        std::cout << "8. Save to File\n";
-        std::cout << "9. Load from File\n";
-        std::cout << "10. Exit\n";
+        std::cout << "1. Display Books\n";
+        std::cout << "2. Search Book by Title\n";
+        std::cout << "3. Sell Book\n";
+        std::cout << "4. Restock Book\n";
+        std::cout << "5. Generate Low Stock Report\n";
+        std::cout << "6. Display Customer Purchases\n";
+        std::cout << "7. Save and Exit\n";
         std::cout << "Enter your choice: ";
         std::cin >> choice;
 
         switch (choice) {
             case 1:
-                recordSystem.displayStudents();
+                bookstore.displayBooks();
                 break;
             case 2: {
-                int rollNumber;
-                std::cout << "Enter the roll number of the student: ";
-                std::cin >> rollNumber;
-                recordSystem.searchStudent(rollNumber);
+                std::string title;
+                std::cout << "Enter the title to search: ";
+                std::cin.ignore();
+                std::getline(std::cin, title);
+                bookstore.searchBooksByTitle(title);
                 break;
             }
             case 3: {
-                std::string name;
-                int rollNumber;
-                double marks;
-                std::cout << "Enter name: ";
+                std::string title, customerName;
+                int quantity;
+                std::cout << "Enter the title of the book: ";
                 std::cin.ignore();
-                std::getline(std::cin, name);
-                std::cout << "Enter roll number: ";
-                std::cin >> rollNumber;
-                std::cout << "Enter marks: ";
-                std::cin >> marks;
-                recordSystem.addStudent(Student(name, rollNumber, marks));
+                std::getline(std::cin, title);
+                std::cout << "Enter the quantity to sell: ";
+                std::cin >> quantity;
+                std::cout << "Enter customer name: ";
+                std::cin.ignore();
+                std::getline(std::cin, customerName);
+
+                if (bookstore.sellBook(title, quantity, customerName))
+                    std::cout << "Sale successful.\n";
+                else
+                    std::cout << "Book not available or insufficient quantity.\n";
                 break;
             }
             case 4: {
-                int rollNumber;
-                std::cout << "Enter the roll number of the student to update: ";
-                std::cin >> rollNumber;
-                recordSystem.updateStudent(rollNumber);
+                std::string title;
+                int quantity;
+                std::cout << "Enter the title of the book: ";
+                std::cin.ignore();
+                std::getline(std::cin, title);
+                std::cout << "Enter the quantity to restock: ";
+                std::cin >> quantity;
+
+                if (bookstore.restockBook(title, quantity))
+                    std::cout << "Restock successful.\n";
+                else
+                    std::cout << "Book not found.\n";
                 break;
             }
             case 5: {
-                int rollNumber;
-                std::cout << "Enter the roll number of the student to delete: ";
-                std::cin >> rollNumber;
-                recordSystem.deleteStudent(rollNumber);
+                int threshold;
+                std::cout << "Enter the threshold for low stock report: ";
+                std::cin >> threshold;
+                bookstore.generateLowStockReport(threshold);
                 break;
             }
-            case 6:
-                recordSystem.sortStudents(true); // Sort by marks
-                break;
-            case 7:
-                recordSystem.sortStudents(false); // Sort by name
-                break;
-            case 8: {
-                std::string filename;
-                std::cout << "Enter filename to save to: ";
-                std::cin >> filename;
-                recordSystem.saveToFile(filename);
-                break;
-            }
-            case 9: {
-                std::string filename;
-                std::cout << "Enter filename to load from: ";
-                std::cin >> filename;
-                recordSystem.loadFromFile(filename);
-                break;
-            }
-            case 10:
-                std::cout << "Exiting program.\n";
-                break;
-            default:
-                std::cout << "Invalid choice. Try again.\n";
-        }
-
-    } while (choice != 10);
-
-    return 0;
-}
+            case 6: {
+                std::string customerName;
+                std::cout << "Enter customer name: ";
+                std::cin.ignore();
+                std::getline(std::cin, customerName);
+                bookstore.displayCustomerPurchases(customerName);
+                break
